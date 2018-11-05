@@ -1,0 +1,71 @@
+WORD_DICT
+padding 0
+a 1
+person 2
+on 3
+horse 4
+jumps 5
+over 6
+broken 7
+down 8
+airplane 9
+is 10
+training 11 
+his 12
+for 13
+competition 14
+at 15
+diner 16
+, 17
+. 18
+ordering 19
+an 20
+omelette 21
+outdoors 22
+
+CHAR_DICT
+a 1
+b 2
+c 3
+d 4
+e 5
+f 6
+g 7
+h 8
+i 9
+j 10
+k 11
+l 12
+m 13
+n 14
+o 15
+p 16
+q 17
+r 18
+s 19
+t 20
+u 21
+v 22
+w 23
+x 24
+y 25
+z 26
+, 27
+. 28
+
+DATA
+neutral 0
+A person on a horse jumps over a broken down airplane.
+A person is training his horse for a competition.
+[1, 2, 3, 1, 4, 5, 6, 1, 7, 8, 9]
+[1, 2,10,11,12, 4,13, 1,14, 0, 0]
+contradiction 1
+A person on a horse jumps over a broken down airplane.
+A person is at a diner, ordering an omelette.
+[1, 2, 3, 1, 4, 5, 6, 1, 7, 8, 9]
+[1, 2,10,15, 1,16,17,19,20,21, 0]
+entailment 2
+A person on a horse jumps over a broken down airplane.
+A person is outdoors, on a horse.
+[1, 2, 3, 1, 4, 5, 6, 1, 7, 8, 9]
+[1, 2,10,22,17, 3, 1, 4, 0, 0, 0]
