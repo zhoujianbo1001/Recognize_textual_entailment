@@ -3,8 +3,9 @@
 import tensorflow as tf
 
 def multi_denses(
-    inputs, out_size, num_layers, weight_decay=0.0, 
-    is_train=False, dropout_p=0.5, scope="multi_denses"):
+    inputs, out_size, num_layers, residual_connect=True,
+    weight_decay=0.0, is_train=False, dropout_p=0.5, 
+    scope="multi_denses"):
     with tf.variable_scope(scope):
         units = inputs.get_shape().as_list()[-1]
         for i in range(num_layers):
@@ -19,3 +20,18 @@ def multi_denses(
                 kernel_regularizer=lambda x: weight_decay*tf.nn.l2_loss(x))
 
         return inputs
+
+import numpy as np
+
+if __name__ == "__main__":
+    inputs = np.random.rand(2,3,4)*10000
+    print(inputs)
+    inputs = tf.constant(inputs)
+
+    outputs = multi_denses(inputs, out_size=4, num_layers=1)
+
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+
+        out = sess.run(outputs)
+        print(out)

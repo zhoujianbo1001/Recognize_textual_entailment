@@ -9,7 +9,8 @@ import modules.general as general
 import modules.cnn as cnn
 import modules.highway_network as hn
 import modules.attention as attention
-import modules.relation_network as rn
+import modules.dense_net as dn
+# import modules.relation_network as rn
 import modules.fcn as fcn
 
 
@@ -29,6 +30,15 @@ class DIIN(object):
         highway_num_layers=2,
         self_attention_layers=1,
         label_size=3,
+        
+        dn_first_scale_down_ratio=1.0,
+        dn_first_scale_down_filter=1,
+        dn_num_blocks=3,
+        dn_grow_rate=20,
+        dn_num_block_layers=8,
+        dn_filter_height=3,
+        dn_filter_width=3,
+        dn_transition_rate=0.5,
 
         seq_len=48, 
         chars_len=16):
@@ -45,6 +55,15 @@ class DIIN(object):
         self.highway_num_layers = highway_num_layers
         self.self_attention_layers = self_attention_layers
         self.label_size = label_size
+
+        self.dn_first_scale_down_ratio=dn_first_scale_down_ratio,
+        self.dn_first_scale_down_filter=dn_first_scale_down_filter,
+        self.dn_num_blocks=dn_num_blocks,
+        self.dn_grow_rate=dn_grow_rate,
+        self.dn_num_block_layers=dn_num_block_layers,
+        self.dn_filter_height=dn_filter_height,
+        self.dn_filter_width=dn_filter_width,
+        self.dn_transition_rate=dn_transition_rate,
 
         self.seq_len = seq_len
         self.chars_len = chars_len
@@ -110,11 +129,11 @@ class DIIN(object):
             premise_in = tf.concat([premise_in, conv_pre], axis=2)
             hypothesis_in = tf.concat([hypothesis_in, conv_hyp], axis=2)
 
-        # premise_in = tf.concat((premise_in, tf.cast(premise_pos, tf.float32)), axis=2)
-        # hypothesis_in = tf.concat((hypothesis_in, tf.cast(hypothesis_pos, tf.float32)), axis=2)
+        premise_in = tf.concat((premise_in, tf.cast(premise_pos, tf.float32)), axis=2)
+        hypothesis_in = tf.concat((hypothesis_in, tf.cast(hypothesis_pos, tf.float32)), axis=2)
 
-        # premise_in = tf.concat([premise_in, tf.cast(premise_exact_match, tf.float32)], axis=2)
-        # hypothesis_in = tf.concat([hypothesis_in, tf.cast(hypothesis_exact_match, tf.float32)], axis=2)
+        premise_in = tf.concat([premise_in, tf.cast(premise_exact_match, tf.float32)], axis=2)
+        hypothesis_in = tf.concat([hypothesis_in, tf.cast(hypothesis_exact_match, tf.float32)], axis=2)
 
         with tf.variable_scope("highway_network") as scope:
             premise_in = hn.highway_network(
@@ -136,20 +155,39 @@ class DIIN(object):
                     is_train, self.weight_decay, dropout_p,
                     scope="hypo_self_att_layer_{}".format(i))
 
-        rn_out = rn.relation_network(
-            premise_in, hypothesis_in, self.label_size,
-            self.weight_decay, is_train, dropout_p)
-        
-        self.logits = fcn.multi_denses(rn_out, self.label_size, num_layers=3)
+        # rn_out = rn.relation_network(
+        #     premise_in, hypothesis_in, self.label_size,
+        #     self.weight_decay, is_train, dropout_p)
+        dn_in = tf.multiply(premise_in, hypothesis_in)
+        dn_out = dn.dense_net(
+            inputs=dn_in, 
+            out_size=self.label_size, 
+            first_scale_down_ratio=self.dn_first_scale_down_ratio,
+            first_scale_down_filter=self.dn_first_scale_down_filter,
+            num_blocks=self.dn_num_blocks,
+            grow_rate=self.dn_grow_rate,
+            num_block_layers=self.dn_num_block_layers,
+            filter_height=self.dn_filter_height,
+            filter_width=self.dn_filter_width,
+            transition_rate=self.dn_transition_rate,
+            weight_decay=self.weight_decay,
+            is_train=is_train,
+            dropout_p=dropout_p,
+            scope="dense_net"
+        )
+
+        self.debug = dn_out
+        self.logits = dn_out
+        # self.logits = fcn.multi_denses(rn_out, self.label_size, num_layers=1)
         
         self.predict = tf.nn.softmax(self.logits, axis=-1)
         
                                 
     def build_graph(self):
-        self.prem_x = tf.placeholder(tf.int32, [None, None], name='premise')
-        self.hyp_x = tf.placeholder(tf.int32, [None, None], name='hypothesis')
-        self.prem_char = tf.placeholder(tf.int32, [None, None, None], name='premise_char')
-        self.hyp_char = tf.placeholder(tf.int32, [None, None, None], name='hypothesis_char')
+        self.prem_x = tf.placeholder(tf.int32, [None, self.seq_len], name='premise')
+        self.hyp_x = tf.placeholder(tf.int32, [None, self.seq_len], name='hypothesis')
+        self.prem_char = tf.placeholder(tf.int32, [None, None, self.chars_len], name='premise_char')
+        self.hyp_char = tf.placeholder(tf.int32, [None, None, self.chars_len], name='hypothesis_char')
         self.prem_pos = tf.placeholder(tf.int32, [None, None, 47], name='premise_pos')
         self.hyp_pos = tf.placeholder(tf.int32, [None, None, 47], name='hypothesis_pos')
         self.prem_em = tf.placeholder(tf.int32, [None, None, 1], name='premise_exact_match')
@@ -199,10 +237,15 @@ class DIIN(object):
         premise_pos, hypothesis_pos, 
         premise_exact_match, hypothesis_exact_match,
         is_train=True, dropout_p=0.5):
-        _, losses, logits, global_step = sess.run(
+        _, losses, logits, global_step, debug = sess.run(
             [
                 # self.debug,
-                self.train_op, self.losses, self.predict, self.global_step],
+                self.train_op, 
+                self.losses, 
+                self.predict, 
+                self.global_step,
+                self.debug
+            ],
             {   
                 self.y: label_y,
                 self.prem_x: premise_x,
@@ -218,7 +261,7 @@ class DIIN(object):
             }
         )
 
-        return losses, logits, global_step
+        return losses, logits, global_step, debug
 
     def predict(
         self, sess,

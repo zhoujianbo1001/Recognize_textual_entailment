@@ -210,6 +210,6 @@ def encode_snli(
 
 
 if __name__ == '__main__':
-    # create_embedding_and_dict()
-    # create_chars_dict()
+    create_embedding_and_dict()
+    create_chars_dict()
     encode_snli()

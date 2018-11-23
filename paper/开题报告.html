@@ -1,0 +1,106 @@
+<h1 id="选题依据与价值">1. 选题依据与价值</h1>
+<h2 id="课题背景">1.1 课题背景</h2>
+<p>随着自然语言处理(Natural Language Processing, NLP)领域研究的不断深入，学者们的研究已经不只停留在词法解析、句法解析等表层信息的处理上了，让机器理解语义正渐渐成为学者们的研究目标，而自然语言推理作为自然语言理解的重要组成部分，也成为自然语言处理的一项研究热点。</p>
+<p>自然语言推理(Natural Language Inference, NLI)通常是指识别文本间的蕴含关系，所以通常也称为文本蕴含关系识别(Recognize Textual Entailment, RTE)。</p>
+<h2 id="应用价值">1.2 应用价值</h2>
+<p>文本间的蕴含关系普遍存在于自然语言文本之间，所以文本蕴含关系识别在许多自然语言处理领域都存在着实际应用价值。本节将列出一些文本蕴含关系识别的应用<span class="citation"><sup>[1]</sup></span>。</p>
+<p><strong>问答系统</strong> 一个理想的文本蕴含系统可以作为问答系统的答案验证模块，用来判断一个从知识库种抽取的候选答案是否能够推断出目标问题或是目标问题的陈述句形式。例如，某人提问“港珠澳大桥的总工程师是谁？”，通过信息检索技术从知识库中检索出候选答案“林鸣，自2010年12月起，担任港珠澳大桥岛隧工程项目总经理、总工程师”，利用文本蕴含系统可以验证是否可以从候选答案推断出目标问题。为检验文本蕴含系统的这种能力，欧洲跨语言评测平台(Cross Language Evaluation Forum, CLEF)在2006-2008举办了三届答案验证评测(Answer Validation Exercise, AVE)。在评测中，每一条数据由一个问题、一个候选答案和一篇支持文本组成，文本蕴含模型的目标就是在给定支持文本的情景下，针对目标问题，判断候选答案是否正确。</p>
+<p><strong>语义检索</strong> 语义检索的目标是基于检索语句的语义从大量的文档库中检索出目标文档的目标语句。如果将文本蕴含系统运用在语义检索中，它可以用来识别目标问题与目标源文档中各个语句的语义相似性。例如，用户搜索“人们示威反对自由贸易”，现存的基于关键字的搜索引擎将会返回包含“示威”、“自由贸易”等关键字的文档，如果文档中仅存在像“游行人员高举‘反对解除贸易壁垒协议’的标语”这样不含关键字的语句，那将不会被检索到，而造成信息遗漏，利用文本蕴含识别可以避免上述问题。</p>
+<p><strong>自动摘要</strong> 在自动摘要任务中，一个主要的挑战是怎样消除冗余。冗余现象在多文档摘要中特别明显，多文档摘要是融合了多篇源文档的内容，而多篇文档之间的内容可能存在语义相似的，从而造成自动生成的摘要中存在多条语句表达相似语义的问题。文本蕴含识别系统用来判断是否存在语句所表达的语义可以由其他摘要语句推理得到。自动摘要的另一个挑战就是正确性，也就是摘要应该准确地反映单个源文档或多个源文档的内容。文本蕴含识别系统可以通过判断源文档是否可以推理出摘要，以确保摘要的正确性。</p>
+<p><strong>机器翻译的自动评估</strong> 文本蕴含识别的一个相对比较新的应用就是自动评估机器翻译的性能。目前，机器翻译研究者主要利用BLEU作为翻译好坏的指标，BLEU是通过衡量机器翻译语句与人类翻译语句之间的重合程度来，并没有考虑语义层次的相似性。而文本蕴含识别可以判断机器翻译的语句是否可以推断出人类翻译的语句，若可以推断出，则可以认为这是一个好的翻译，即使机器翻译的句子与人类翻译的句子之间没有一个字是一样的。</p>
+<h1 id="国内外研究现状">2. 国内外研究现状</h1>
+<h2 id="文本蕴含识别研究现状">2.1 文本蕴含识别研究现状</h2>
+<h2 id="深度学习在自然语言理解领域的研究现状">2.2 深度学习在自然语言理解领域的研究现状</h2>
+<strong>神经语言模型(Neural Language Model)</strong> 深度学习在自然语言处理领域的第一次影响深远的运用是利用神经网路构建语言模型。语言模型的任务是在已知一句话的前几个词情况下，来预测下一个词。语言模型在自然语言处理领域具有非常重要的地位，在一些简单的自然语言处理实践中被广泛应用，例如：智能拼写、拼写纠错，邮件回复建议。传统的语言模型主要是基于n元语法，并利用数据平滑算法对未登录词进行处理<span class="citation"><sup>[2]</sup></span>。2001年 Bengio 等人<span class="citation"><sup>[3]</sup></span>第一次提出利用前馈神经网络构建语言模型，模型结构如图1所示：
+<center>
+<img src="pics/lm_bengio_2003.png" alt="图1：神经语言模型(Bengio 等人于2001年发表)" width="400"/></br> 图1：神经语言模型(Bengio 等人于2001年发表)</br>
+</center>
+<p></br>该模型将一段文本的前n个词在词表中的索引作为输入，然后在词表C中查找索引所对应的词向量，这种技术现在输出为一个与词表长度一样长的向量，向量的每一位代表对应词是第n+1个词的概率。之后，Mikolov 等人<span class="citation"><sup>[4]</sup></span>尝试利用循环神经网代替全连接神经网为语言模型建模，Graves 等人在此基础上又将循环神经网替换为长短记忆神经网（Long short-term memory neural network，LSTM）<span class="citation"><sup>[5]</sup></span>。直到现在，虽然神经语言模型一直在发展，但是基于LSTM的建模方式依然具有很强的竞争力<span class="citation"><sup>[6]</sup></span>。</br></p>
+<p>神经语言模型虽然功能很简单，但是对后续的很多自然语言处理领域的发展具有深远意义。在词向量研究方面，词向量的训练过程就是一个语言模型的简化。在序列到序列模型中，模型的输出是每个时刻预测一个词，最后形成一串序列，这样的形式也是受到语言模型的启发。在之后的预训练语言模型中，这些预训练的模型的预训练过程都是在训练一个语言模型，以求能够从中理解语义，然后进行迁移学习。</p>
+<p><strong>多任务学习</strong></p>
+<p><strong>词嵌入(Word Embedding)</strong></p>
+  自然语言处理领域在过去很长时间里都是应用词袋模型，利用稀疏向量对文本进行表示。2001年，学者们开始利用稠密向量表示词。2013年，Mikolov 等人<span class="citation"><sup>[7]</sup></span><span class="citation"><sup>[8]</sup></span>提出两种利用神经网络训练词向量的模型，分别是CBOW和Skip-gram，这两种模型可以更加有效地训练词向量。CBOW模型的基本思想是通过中心词的上下文预测中心词，而Skip-gram模型是通过中心词来预测上下文。两个模型的结构如图2所示：
+<center>
+<img src="pics/cbow_skipgram_mikolov_2013.png" alt="图2：CBOW模型和Skip-gram模型的结构(Mikolov 等人于2013年发表)" width="400"/></br> 图1：神经语言模型(Bengio 等人于2001年发表)</br>
+</center>
+<p></br>   集成这两种模型的开源工具word2vec在很多自然语言处理应用中取得很好的效果。利用word2vec工具，Mikolov 等人<span class="citation"><sup>[7]</sup></span><span class="citation"><sup>[8]</sup></span>在大数据集上训练后，发现词向量之间存在着一定的语义关系，例如：词向量&quot;king&quot;减&quot;man&quot;加&quot;woman&quot;可以得到词向量&quot;queue&quot;。</br>   2014年，Pennington 等人<span class="citation"><sup>[9]</sup></span>提出Glove模型，利用矩阵分解的方法训练词向量。相比于word2vec中集成的两个模型，Glove模型引入了全局信息，通过全局矩阵分解和局部的上下文窗口两种方式来提升词向量对语义的表达能力。同时，通过矩阵分解训练的词向量<span class="citation"><sup>[9]</sup></span><span class="citation"><sup>[10]</sup></span><span class="citation"><sup>[11]</sup></span>也可以获得类似word2vec训练出的词向量所具有的语义关系。</br></p>
+<p><strong>神经网络在自然语言处理中的应用</strong></p>
+<p>循环神经网络(Recurrent Neural Network)、卷积神经网络(Convolution Neural Netword)及递归神经网络(Recursive Neural Network)</p>
+<p><strong>序列到序列(Sequence to Sequence) 模型框架</strong></p>
+  在自然语言处理领域，有很多序列到序列的任务，例如：机器翻译、语音识别、摘要自动生成等任务。2014年， Sutskever 等人<span class="citation"><sup>[12]</sup></span>首次提出序列到序列的模型，这是一个将一个序列映射到另一个序列的通用模型框架，模型结构如图所示：
+<center>
+<img src="pics/sutskever_nips2014.png" alt="图：序列到序列模型(Sutskever 等人于2014年发表)" width="400"/></br> 图：序列到序列模型(Sutskever 等人于2014年发表)</br>
+</center>
+<p></br>   序列到序列模型由一个编码器和解码器构成，编码器将输入序列压缩成一个定长的稠密向量，解码器将编码器输出的稠密向量解码成任务所需要的输出序列。编码器和解码器的网络结构主要是基于循环神经网络，在此基础上也发展出一些变体。目前，序列到序列模型的编码器网络结构有长短记忆神经网络(LSTM)<span class="citation"><sup>[13]</sup></span>、卷积神经网络(CNN)<span class="citation"><sup>[14]</sup></span><span class="citation"><sup>[15]</sup></span>、Transfomer<span class="citation"><sup>[16]</sup></span>以及一些混合结构<span class="citation"><sup>[17]</sup></span>，解码器部分的网络结构与编码器类似，不过鲜有论文采用卷积神经网络结构。</p>
+<p><strong>注意力机制(Attention)</strong></p>
+<p>  注意力机制(Attention Mechanism)是一个能够有效改善模型效果的机制，其在计算机视觉及自然语言处理领域均有广泛应用。2015年，Bahdanau 等人<span class="citation"><sup>[18]</sup></span>首次应用在机器翻译中Attention机制，这个关键创新使得基于神经网络的机器翻译在性能上远远超过传统模型。</p>
+<p><strong>记忆网络(Memory-based Networks)</strong></p>
+<p><strong>预训练模型</strong></p>
+<h1 id="关键理论和技术">3. 关键理论和技术</h1>
+<h2 id="elmo模型">ELMo模型</h2>
+<h2 id="attention机制">Attention机制</h2>
+<h1 id="研究内容与实施方案">研究内容与实施方案</h1>
+<h2 id="研究内容">研究内容</h2>
+<h3 id="multinli数据集介绍">MultiNLI数据集介绍</h3>
+<p>  MultiNLI (Multi-Genre Natural Language Inference) 数据集<span class="citation"><sup>[19]</sup></span></p>
+<h2 id="实施方案">实施方案</h2>
+<h1 id="参考文献" class="unnumbered">参考文献</h1>
+<div id="refs" class="references">
+<div id="ref-MacCartney2009">
+<p>[1] MACCARTNEY B. Natural Language Inference[D]. 2009: 179.</p>
+</div>
+<div id="ref-Kneser1995Improved">
+<p>[2] KNESER R, NEY H. Improved Backing-off for N-gram Language Modeling[C]//International Conference on Acoustics, Speech, and Signal Processing. 1995: 181–184 vol.1.</p>
+</div>
+<div id="ref-nnlm:2001:nips">
+<p>[3] BENGIO Y, DUCHARME R, VINCENT P. A Neural Probabilistic Language Model[C]//2001.</p>
+</div>
+<div id="ref-DBLP:conf/interspeech/2010">
+<p>[4] INTERSPEECH 2010, 11th Annual Conference of the International Speech Communication Association, Makuhari, Chiba, Japan, September 26-30, 2010[M]. KOBAYASHI T, HIROSE K, NAKAMURA S. ISCA, 2010.</p>
+</div>
+<div id="ref-DBLP:journals/corr/Graves13">
+<p>[5] GRAVES A. Generating Sequences With Recurrent Neural Networks[J]. CoRR, 2013, abs/1308.0850.</p>
+</div>
+<div id="ref-DBLP:journals/corr/MelisDB17">
+<p>[6] MELIS G, DYER C, BLUNSOM P. On the State of the Art of Evaluation in Neural Language Models[J]. CoRR, 2017, abs/1707.05589.</p>
+</div>
+<div id="ref-Mikolov2013_1">
+<p>[7] MIKOLOV T, CHEN K, CORRADO G, 等. Efficient Estimation of Word Representations in Vector Space[J]. 2013: 1–12.</p>
+</div>
+<div id="ref-Mikolov2013_2">
+<p>[8] MIKOLOV T, SUTSKEVER I, CHEN K, 等. Distributed Representations of Words and Phrases and their Compositionality[J]. 2013: 1–9.</p>
+</div>
+<div id="ref-Pennington2014">
+<p>[9] PENNINGTON J, SOCHER R, MANNING C D. GloVe: Global Vectors for Word Representation[J]. 2014.</p>
+</div>
+<div id="ref-DBLP:conf/nips/LevyG14">
+<p>[10] LEVY O, GOLDBERG Y. Neural Word Embedding as Implicit Matrix Factorization[C]//Advances in Neural Information Processing Systems 27: Annual Conference on Neural Information Processing Systems 2014, December 8-13 2014, Montreal, Quebec, Canada. 2014: 2177–2185.</p>
+</div>
+<div id="ref-DBLP:journals/tacl/LevyGD15">
+<p>[11] LEVY O, GOLDBERG Y, DAGAN I. Improving Distributional Similarity with Lessons Learned from Word Embeddings[J]. TACL, 2015, 3: 211–225.</p>
+</div>
+<div id="ref-DBLP:journals/corr/SutskeverVL14">
+<p>[12] SUTSKEVER I, VINYALS O, LE Q V. Sequence to Sequence Learning with Neural Networks[J]. CoRR, 2014, abs/1409.3215.</p>
+</div>
+<div id="ref-DBLP:journals/corr/WuSCLNMKCGMKSJL16">
+<p>[13] WU Y, SCHUSTER M, CHEN Z, 等. Google’s Neural Machine Translation System: Bridging the Gap between Human and Machine Translation[J]. CoRR, 2016, abs/1609.08144.</p>
+</div>
+<div id="ref-Kalchbrenner2016Neural">
+<p>[14] KALCHBRENNER N, ESPEHOLT L, SIMONYAN K, 等. Neural Machine Translation in Linear Time[J]. 2016.</p>
+</div>
+<div id="ref-Gehring2017Convolutional">
+<p>[15] GEHRING J, AULI M, GRANGIER D, 等. Convolutional Sequence to Sequence Learning[J]. 2017.</p>
+</div>
+<div id="ref-Vaswani2017Attention">
+<p>[16] VASWANI A, SHAZEER N, PARMAR N, 等. Attention Is All You Need[J]. 2017.</p>
+</div>
+<div id="ref-Chen2018The">
+<p>[17] CHEN M X, FIRAT O, BAPNA A, 等. The Best of Both Worlds: Combining Recent Advances in Neural Machine Translation[J]. 2018.</p>
+</div>
+<div id="ref-DBLP:journals/corr/BahdanauCB14">
+<p>[18] BAHDANAU D, CHO K, BENGIO Y. Neural Machine Translation by Jointly Learning to Align and Translate[J]. CoRR, 2014, abs/1409.0473.</p>
+</div>
+<div id="ref-N18-1101">
+<p>[19] WILLIAMS A, NANGIA N, BOWMAN S. A Broad-Coverage Challenge Corpus for Sentence Understanding through Inference[C]//Proceedings of the 2018 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long Papers). New Orleans, Louisiana: Association for Computational Linguistics, 2018: 1112–1122.</p>
+</div>
+</div>
