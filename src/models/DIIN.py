@@ -12,62 +12,12 @@ import modules.attention as attention
 import modules.dense_net as dn
 import modules.relation_network as rn
 import modules.fcn as fcn
+import params
 
 
 class DIIN(object):
-    def __init__(
-        self, 
-        emb_train=True, 
-        embeddings=None,
-        vocab_size=100,##
-        emb_dim=50,##
-        chars_vocab_size=50,##
-        chars_emb_dim=50,##
-        filters_out_channels=[100],
-        filters_width=[5],
-        char_out_size=100,
-        weight_decay=0.0,
-        highway_num_layers=2,
-        self_attention_layers=1,
-        label_size=3,
-        
-        dn_first_scale_down_ratio=1.0,
-        dn_first_scale_down_filter=1,
-        dn_num_blocks=3,
-        dn_grow_rate=20,
-        dn_num_block_layers=8,
-        dn_filter_height=3,
-        dn_filter_width=3,
-        dn_transition_rate=0.5,
-
-        seq_len=48, 
-        chars_len=16):
-        self.emb_train = emb_train
+    def __init__(self, embeddings=None):
         self.embeddings = embeddings
-        self.vocab_size = vocab_size
-        self.emb_dim = emb_dim
-        self.chars_vocab_size = chars_vocab_size
-        self.chars_emb_dim = chars_emb_dim
-        self.filters_out_channels = filters_out_channels
-        self.filters_width = filters_width
-        self.char_out_size = char_out_size
-        self.weight_decay = weight_decay
-        self.highway_num_layers = highway_num_layers
-        self.self_attention_layers = self_attention_layers
-        self.label_size = label_size
-
-
-        self.dn_first_scale_down_ratio=dn_first_scale_down_ratio
-        self.dn_first_scale_down_filter=dn_first_scale_down_filter
-        self.dn_num_blocks=dn_num_blocks
-        self.dn_grow_rate=dn_grow_rate
-        self.dn_num_block_layers=dn_num_block_layers
-        self.dn_filter_height=dn_filter_height
-        self.dn_filter_width=dn_filter_width
-        self.dn_transition_rate=dn_transition_rate
-
-        self.seq_len = seq_len
-        self.chars_len = chars_len
 
     def forward(
         self, 
@@ -78,9 +28,7 @@ class DIIN(object):
         premise_pos=None, 
         hypothesis_pos=None, 
         premise_exact_match=None, 
-        hypothesis_exact_match=None,
-        is_train, 
-        dropout_p):
+        hypothesis_exact_match=None):
         # Fucntion for embedding lookup and dropout at embedding layer
         def emb_drop(E, x):
             emb = tf.nn.embedding_lookup(E, x)
@@ -109,11 +57,6 @@ class DIIN(object):
             premise_in = emb_drop(E, premise_x)   #P
             hypothesis_in = emb_drop(E, hypothesis_x)  #H
         
-        
-
-            premise_in = tf.concat([premise_in, conv_pre], axis=2)
-            hypothesis_in = tf.concat([hypothesis_in, conv_hyp], axis=2)
-
         # premise_in = tf.concat((premise_in, tf.cast(premise_pos, tf.float32)), axis=2)
         # hypothesis_in = tf.concat((hypothesis_in, tf.cast(hypothesis_pos, tf.float32)), axis=2)
 
@@ -285,6 +228,9 @@ def apply_char_emb():
             conv_hyp = cnn.multi_conv1d(
                 char_hyp, self.filters_width, self.filters_out_channels,
                 "VALID", is_train, dropout_p, self.weight_decay, scope="conv")
+
+        premise_in = tf.concat([premise_in, conv_pre], axis=2)
+        hypothesis_in = tf.concat([hypothesis_in, conv_hyp], axis=2)
 
 def apply_relation_network(premise_in, hypothesis_in, configs):
     rn_out = rn.relation_network(
