@@ -4,7 +4,7 @@ import tensorflow as tf
 
 def dense_net(
     inputs, out_size, first_scale_down_ratio, first_scale_down_filter, num_blocks, grow_rate, num_block_layers, 
-    filter_height, filter_width, transition_rate, weight_decay=0.0, is_train=False, dropout_p=0.5, scope="dense_net"):
+    filter_height, filter_width, transition_rate, weight_decay=0.0, is_train=False, dropout_p=1.0, scope="dense_net"):
     """
     The module of DenseNet
     Params:
@@ -24,21 +24,19 @@ def dense_net(
             "first_filter", [first_scale_down_filter, first_scale_down_filter, in_channels, dim],
             initializer=tf.glorot_normal_initializer(), regularizer=lambda x: weight_decay*tf.nn.l2_loss(x))
         feature_map = tf.nn.conv2d(inputs, filter, [1,1,1,1], "SAME")
-        reature_map = tf.nn.relu(feature_map)
+        feature_map = tf.nn.relu(feature_map)
         
         for i in range(num_blocks):
             # [batch_size, height, width, in_channels + num_block_layers*grow_rate]
             feature_map = dense_block(
                 feature_map, grow_rate, num_block_layers, filter_height, filter_width, 
                 weight_decay=weight_decay, scope="block_{}".format(i))
-            print(feature_map)
             # [batch_size, height-ksize+1, width-ksize+1, in_channels*trasition_rate]
             feature_map = dense_transition_layer(
                 feature_map, transition_rate, weight_decay=weight_decay, scope="transition_{}".format(i))
 
         feature_shape = feature_map.get_shape().as_list()
         feature_map = tf.reshape(feature_map, [-1, feature_shape[1]*feature_shape[2]*feature_shape[3]])
-        print(feature_map)
         outs = tf.layers.dense(
             feature_map, out_size, activation=tf.nn.relu, use_bias=False,
             kernel_initializer=tf.glorot_normal_initializer(),
@@ -109,4 +107,5 @@ if __name__ == "__main__":
             dn_out,
             {p: inputs}
         )
+        print(dn)
         print(dn.shape)

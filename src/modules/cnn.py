@@ -2,7 +2,7 @@ import tensorflow as tf
 
 def conv1d(
     inputs, filter_width, out_channels, 
-    padding="VALID", is_train=False, dropout_p=0.5,
+    padding="VALID", is_train=False, dropout_p=1.0,
     weight_decay=0.0, scope="conv1d"):
     """
     The convolution layer of 1-D
@@ -33,7 +33,7 @@ def conv1d(
 
 def multi_conv1d(
     inputs, filters_width, filters_out_channels,
-    padding="VALID", is_train=False, dropout_p=0.5,
+    padding="VALID", is_train=False, dropout_p=1.0,
     weight_decay=0.0, scope="multi_conv"):
     """
     The multiply convolution layers of 1-D

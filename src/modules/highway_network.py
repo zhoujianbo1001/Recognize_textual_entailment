@@ -2,7 +2,7 @@ import tensorflow as tf
 
 def highway_layer(
     inputs, output_size=None,
-    is_train=False, dropout_p=0.5, weight_decay=0.0,
+    is_train=False, dropout_p=1.0, weight_decay=0.0,
     scope="highway_layer"):
     """
     The highway layer module

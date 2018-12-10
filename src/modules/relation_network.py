@@ -1,23 +1,13 @@
 # -*- coding: UTF-8 -*-
 
-#==============================================================================
-#
-#      Description: Implementation of attention modules
-#       Department: AI Algorithms Group
-#             Date: 2018-10-25
-#            Admin: jianbo zhou
-#           E-mail: zhoujb@ynt.ai
-#
-#==============================================================================
-
 import tensorflow as tf
 
 def relation_network(
     input1, 
     input2,
     output_size,
-    weight_decay=0.0,
     is_train=False,
+    weight_decay=0.0,
     dropout_p=0.5,
     scope="relation_network"):
     """

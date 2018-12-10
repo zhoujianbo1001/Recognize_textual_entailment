@@ -2,74 +2,151 @@ import tensorflow as tf
 
 VERY_NEGATIVE_NUMBER = -1e30
 
-def self_attention(
-    inputs, mask=None, att_func="dot-product", 
-    is_train=False, weight_decay=0.0, dropout_p=0.5,
-    scope="self_attention"):
+def multi_head_attention(
+    query, values, h=8, mask=None, func_att="dot-product", scaled=True,
+    is_train=False, weight_decay=0.0, dropout_p=1.0,
+    scope="multi_head_attention"):
     """
-    The self attention module
+    The multi-head attention module.
     Params:
-        inputs: the shape is (batch_size, seq_len, dim).
-        mask: the shape is (batch_size, seq_len), the number is 0 or 1
-            if mask is not given, self attention will not express mask.
+        query: the shape is (batch_size, query_len, dim).
+        values: the shape is (batch_size, values_len, dim).
+        h: the number of heads.
+        mask: the shape is (batch_size, values_len), the number is 0 or 1
+            if mask is not given, attention will not apply mask.
     Returns:
-        outputs: the shape is (batch_size, seq_len, dim)
+        outputs: the shape is (batch_size, query_len, dim)
     """
     with tf.variable_scope(scope):
-        ali_out = attention_alignment(
-            inputs, inputs, 
-            func=att_func,
+        dim = query.shape[-1]
+        
+        #[batch_size, query_len, dim*h]
+        query_dense = tf.layers.dense(
+            query, dim*h,use_bias=False, 
+            kernel_initializer=tf.glorot_normal_initializer(),
+            kernel_regularizer=lambda x: weight_decay*tf.nn.l2_loss(x),
+            name="query_dense")
+        #[batch_size, values_len, dim*h]
+        values_dense = tf.layers.dense(
+            values, dim*h, use_bias=False, 
+            kernel_initializer=tf.glorot_normal_initializer(),
+            kernel_regularizer=lambda x: weight_decay*tf.nn.l2_loss(x),
+            name="values_dense")
+        # [h*batch_size, query_len, dim]
+        query = tf.concat(tf.split(query_dense, h, axis=-1), axis=0)
+        # [h*batch_size, value_len, dim]
+        values = tf.concat(tf.split(values_dense, h, axis=-1), axis=0)
+        
+        mask = tf.reshape(tf.tile(tf.expand_dims(mask, 0), [h, 1, 1]), [-1, mask.shape[-1]])
+        # [h*batch_size, query_len, dim]
+        multi_head = attention(
+            query, values, mask=mask, func_att=func_att, scaled=scaled,
+            is_train=is_train, weight_decay=0.0, dropout_p=1.0)
+
+        # [batch_size, query_len, dim*h]
+        multi_head = tf.concat(
+            tf.split(multi_head, h ,axis=0),
+            axis=-1)
+        
+        def position_wise_ffn(inputs, scope="position_wise_ffn"):
+            with tf.variable_scope(scope):
+                filter_1 = tf.get_variable(
+                    "filter_1", shape=[1, dim*h, dim], dtype=tf.float32, 
+                    initializer=tf.glorot_normal_initializer(),
+                    regularizer=lambda x: weight_decay*tf.nn.l2_loss(x))
+                bias_1 = tf.get_variable(
+                    "bias_1", shape=[dim], dtype=tf.float32, 
+                    initializer=tf.glorot_normal_initializer(),
+                    regularizer=lambda x: weight_decay*tf.nn.l2_loss(x))
+                # [batch_size, len, dim]
+                conv_1 = tf.nn.relu(
+                    tf.nn.conv1d(inputs, filter_1, 1, "SAME")+bias_1)
+                filter_2 = tf.get_variable(
+                    "filter_2", shape=[1, dim, dim], dtype=tf.float32, 
+                    initializer=tf.glorot_normal_initializer(),
+                    regularizer=lambda x: weight_decay*tf.nn.l2_loss(x))
+                bias_2 = tf.get_variable(
+                    "bias_2", shape=[dim], dtype=tf.float32, 
+                    initializer=tf.glorot_normal_initializer(),
+                    regularizer=lambda x: weight_decay*tf.nn.l2_loss(x))
+                conv_2 = tf.nn.conv1d(conv_1, filter_2, 1, "SAME")+bias_2
+                return conv_2
+        # [batch_size, query_len, dim]
+        outputs = position_wise_ffn(multi_head)
+        return outputs
+        
+        
+
+def attention(
+    query, values, mask=None, func_att="dot-product", scaled=True,
+    is_train=False, weight_decay=0.0, dropout_p=1.0,
+    scope="attention"):
+    """
+    The attention module
+    Params:
+        query: the shape is (batch_size, query_len, dim).
+        values: the shape is (batch_size, values_len, dim).
+        mask: the shape is (batch_size, values_len), the number is 0 or 1
+            if mask is not given, attention will not apply mask.
+        func_att: the function of attention
+        scaled: the type is boolen, which reflects whether scaled the func_att or not.
+    Returns:
+        att_out: the shape is (batch_size, query_len, dim)
+    """
+    with tf.variable_scope(scope):
+        func_out = func_attention(
+            query, values, 
+            func=func_att,
+            scaled=scaled,
             is_train=is_train,
             weight_decay=weight_decay,
             dropout_p=dropout_p)
-        att_logits = get_att_logits(ali_out, mask)
-        att_out = tf.matmul(att_logits, inputs)
+        att_logits = get_att_logits(func_out, mask)
+        att_out = tf.matmul(att_logits, values)
 
-        output = fuse_gate(
-            inputs, att_out, 
-            weight_decay=weight_decay,
-            is_train=is_train,
-            dropout_p=dropout_p)
+        return att_out
 
-        return output
-
-def attention_alignment(
-    input1, input2, func="dot-product", 
-    is_train=False, weight_decay=0.0, dropout_p=0.5,
+def func_attention(
+    query, values, func="dot-product", scaled=True,
+    is_train=False, weight_decay=0.0, dropout_p=1.0,
     scope="attention_alignment"):
     """
-    The attention's alignment model
+    The attention function.
     Params:
-        input1: the main sequence, whose shape is [batch_size, len1, dim]
-        input2: the context sequence, whose shape is [batch_size, len2, dim]
+        query: the shape is [batch_size, query_len, dim]
+        values: the shape is [batch_size, values_len, dim]
     Returns:
-        output: [batch_size, len1, len2]
+        output: [batch_size, query_len, values_len]
     """
     with tf.variable_scope(scope):
         if func == "dot-product":
-            output = tf.matmul(input1, input2, transpose_b=True)
+            output = tf.matmul(query, values, transpose_b=True)
 
         elif func == "multiplicative-att":
-            input2 = tf.cond(tf.equal(is_train, True), lambda: tf.nn.dropout(input2, dropout_p), lambda: input2)
-            dim = input1.shape[-1]
-            input2 = tf.layers.dense(
-                input2, dim, use_bias=False, 
+            values = tf.cond(tf.equal(is_train, True), lambda: tf.nn.dropout(values, dropout_p), lambda: values)
+            dim = query.shape[-1]
+            values = tf.layers.dense(
+                values, dim, use_bias=False, 
                 kernel_initializer=tf.glorot_normal_initializer(),
                 kernel_regularizer=lambda x: weight_decay*tf.nn.l2_loss(x),
-                name="input2_dense")
-            output = tf.matmul(input1, input2, transpose_b=True)
+                name="values_dense")
+            output = tf.matmul(query, values, transpose_b=True)
 
         elif func == "additive-att":
-            input1_shape = input1.shape
-            input2_shape = input2.shape
-            input1 = tf.manip.tile(tf.expand_dims(input1, 2), [1, 1, input2_shape[1], 1])
-            input2 = tf.manip.tile(tf.expand_dims(input2, 1), [1, input1_shape[1], 1, 1])
-            inputs = tf.concat([input1, input2], -1)
+            query_shape = query.shape
+            values_shape = values.shape
+            # [batch_size, query_len, values_len, dim]
+            query = tf.manip.tile(tf.expand_dims(query, 2), [1, 1, values_shape[1], 1])
+            values = tf.manip.tile(tf.expand_dims(values, 1), [1, query_shape[1], 1, 1])
+
+            inputs = tf.concat([query, values], -1)
+
             inputs = tf.cond(tf.equal(is_train, True), lambda: tf.nn.dropout(inputs, dropout_p), lambda: inputs)
             inputs = tf.layers.dense(
-                inputs, input1_shape[-1], activation=tf.nn.tanh, use_bias=False, 
+                inputs, values_shape[-1], activation=tf.nn.tanh, use_bias=False, 
                 kernel_initializer=tf.glorot_normal_initializer(),
                 kernel_regularizer=lambda x: weight_decay*tf.nn.l2_loss(x))
+
             inputs = tf.cond(tf.equal(is_train, True), lambda: tf.nn.dropout(inputs, dropout_p), lambda: inputs)
             inputs = tf.layers.dense(
                 inputs, 1, use_bias=False, 
@@ -78,8 +155,14 @@ def attention_alignment(
             output = tf.squeeze(inputs, -1)
 
         else:
-            raise Exception
-
+            raise NotImplementedError
+        if scaled:
+            output = tf.multiply(
+                output, 
+                tf.rsqrt(
+                    tf.cast(query.shape[-1],tf.float32)
+                )
+            )
         return output
 
 def get_att_logits(inputs, mask=None, scope="get_att_logits"):
@@ -91,13 +174,13 @@ def get_att_logits(inputs, mask=None, scope="get_att_logits"):
     """
     if mask is not None:
         mask = tf.expand_dims(mask, axis=1)
-        inputs = exp_mask(inputs, mask)
+        inputs = apply_mask(inputs, mask)
     return tf.nn.softmax(inputs, axis=-1)
 
-def exp_mask(val, mask, name="exp_mask"):
+def apply_mask(val, mask, name="apply_mask"):
     """
     Give very negative number to unmasked elements in val.
-    For example, [-3, -2, 10], [True, True, False] -> [-3, -2, -1e9].
+    For example, [-3, -2, 10], [1, 1, 0] -> [-3, -2, -1e9].
     Typically, this effectively masks in exponential space (e.g. softmax)
     Params:
         val: values to be masked, whose shape is [batch_size, len1, len2]
@@ -108,11 +191,12 @@ def exp_mask(val, mask, name="exp_mask"):
     """
     return tf.add(val, (1 - tf.cast(mask, 'float')) * VERY_NEGATIVE_NUMBER, name=name)
 
+# not use
 def fuse_gate(
     input1, input2,
     weight_decay=0.1,
     is_train=False,
-    dropout_p=0.5,
+    dropout_p=1.0,
     scope="fuse_gate"):
     with tf.variable_scope(scope):
         dim = input1.shape[-1]
@@ -139,6 +223,7 @@ def fuse_gate(
 
 
 if __name__ == "__main__":
+    #[2, 4, 3]
     inputs = tf.constant(
         [
             [
@@ -156,19 +241,34 @@ if __name__ == "__main__":
         ],
         dtype=tf.float32
     )
-
-    mask = [
+    # [2, 4]
+    mask = tf.constant([
         [1,1,1,0],
         [1,1,0,0]
-    ]
-
-    att_out = self_attention(
-        inputs, mask, 
-        att_func="additive-att",
+    ])
+    # test attention
+    att_out_1 = attention(
+        query=inputs, values=inputs, mask=mask, 
+        func_att="dot-product",
+        weight_decay=0.1,
+        is_train=True)
+    att_out_2 = attention(
+        query=inputs, values=inputs, mask=mask, 
+        func_att="multiplicative-att",
+        weight_decay=0.1,
+        is_train=True)
+    att_out_3 = attention(
+        query=inputs, values=inputs, mask=mask, 
+        func_att="additive-att",
         weight_decay=0.1,
         is_train=True)
         
+    # test multi-head attention
+    multi_head_out = multi_head_attention(inputs, inputs, mask=mask)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        print(sess.run([att_out]))
+        print(sess.run([att_out_1]))
+        print(sess.run([att_out_2]))
+        print(sess.run([att_out_3]))
+        print(sess.run([multi_head_out]))
     

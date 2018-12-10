@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
-CURRENT_PATH = os.path.dirname(__file__)
+CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 import tensorflow as tf
 import numpy as np
 import sklearn as sl
@@ -18,7 +18,8 @@ dropout_p = 0.8
 
 report_interval = 50
 
-save_path = CURRENT_PATH+"/ckpt/snli.ckpt"
+ckpt_path = CURRENT_PATH+"/ckpt/snli.ckpt"
+ckpt_dir = CURRENT_PATH+"/ckpt"
 
 ############################
 # model params
@@ -42,7 +43,7 @@ chars_len=16
 def train_snli():
     snli_log = open(CURRENT_PATH+"/train_snli.log", 'w')
 
-    # create computer graph.
+    # create compute graph.
     embeddings = read_embedding_table()
     vocab_size = embeddings.shape[0]# Don't include PADDING and UNKNOWN
     emb_dim = embeddings.shape[-1]
@@ -62,7 +63,13 @@ def train_snli():
     saver = tf.train.Saver()
 
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+        if tf.train.get_checkpoint_state(ckpt_dir):
+            print("Checkpoint exists.")
+            print(tf.train.latest_checkpoint(ckpt_dir))
+            saver.restore(sess, tf.train.latest_checkpoint(ckpt_dir))
+        else:
+            print("Checkpoint does't exist.")
+            sess.run(tf.global_variables_initializer())
         # read data set
         data_obj = read_data(snli_dev_path)
 
@@ -84,18 +91,33 @@ def train_snli():
             hypothesis_exact_match = np.random.randint(low=0, high=2, size=(batch_size, 10,1), dtype=np.int32)
             #############################
 
+            ################## Words processing ######################
+            def pad_words(sentence_word):
+                if sentence_word.shape[-1] < seq_len:
+                    pad_len = seq_len-sentence_word.shape[-1]
+                    sentence_word = np.pad(
+                        sentence_word, ((0,0),(0,pad_len)), 
+                        "constant")
+                return sentence_word
+
+            batch_data["sentence1_word"] = pad_words(batch_data["sentence1_word"])
+            batch_data["sentence2_word"] = pad_words(batch_data["sentence2_word"])
+            print(batch_data["sentence1_word"].shape)
+
+            ################## Characters process #####################
             def pad_chars(sentence_char):
-                if sentence_char.shape[-1] < np.max(filters_width):
-                    pad_len = np.max(filters_width) - sentence_char.shape[-1]
-                    np.pad(
-                        sentence_char, ((0,0),(0,0),(0,pad_len)), 
+                if sentence_char.shape[-1] < chars_len:
+                    pad_word = seq_len - sentence_char.shape[1]
+                    pad_char = chars_len - sentence_char.shape[-1]
+                    sentence_char = np.pad(
+                        sentence_char, ((0,0),(0,pad_word),(0,pad_char)), 
                         "constant", constant_values=(0,0))
                 return sentence_char
 
             batch_data["sentence1_char"] = pad_chars(batch_data["sentence1_char"])
             batch_data["sentence2_char"] = pad_chars(batch_data["sentence2_char"])
 
-            losses, predict, global_step = diin.update(
+            losses, predict, global_step, debug = diin.update(
                 sess, batch_data["label"],
                 batch_data["sentence1_word"],
                 batch_data["sentence2_word"],
@@ -108,7 +130,7 @@ def train_snli():
 
             if current_batch % report_interval == 0:
                 # save model
-                saver.save(sess, save_path, global_step=global_step)
+                saver.save(sess, ckpt_path, global_step=global_step)
 
                 predict_label = np.argmax(predict, axis=-1)
                 accuracy = sl.metrics.accuracy_score(batch_data["label"], predict_label)
