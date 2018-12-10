@@ -1,0 +1,9 @@
+data/*
+!data/download_data.py
+src/**/__pycache__/*
+src/**/data/*
+!src/**/data/download_data.py
+src/**/ckpt/*
+!src/**/ckpt/.gitignore
+src/**/*.log
+src/**/*.swp
