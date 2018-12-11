@@ -9,6 +9,10 @@ from models.DIIN import DIIN
 from utils.read_data import read_embedding_table, read_data, read_batch_data,\
 snli_train_path, snli_dev_path, snli_test_path, read_vocab_size, read_chars_vocab_size
 
+import params
+
+CONFIGS = params.load_configs()
+
 ############################
 # train params
 epoch = 10000
@@ -51,13 +55,10 @@ def train_snli():
     chars_vocab_size = read_chars_vocab_size()# Don't include PADDING
     chars_emb_dim = emb_dim
 
-    diin = DIIN(
-        emb_train, embeddings, vocab_size, emb_dim, chars_vocab_size, chars_emb_dim,
-        filters_out_channels, filters_width, char_out_size, 
-        weight_decay, highway_num_layers, self_attention_layers, label_size)
+    diin = DIIN(embeddings)
     diin.build_graph()
     diin.build_loss()
-    diin.build_train_op()
+    diin.build_train_op(lr=CONFIGS.lr)
 
     # Saver
     saver = tf.train.Saver()
@@ -74,7 +75,7 @@ def train_snli():
         data_obj = read_data(snli_dev_path)
 
         current_epoch = 0
-        current_batch = 1
+        current_batch = 0
         total_losses = 0
         while(current_epoch < epoch):
             # read batch data
@@ -102,7 +103,7 @@ def train_snli():
 
             batch_data["sentence1_word"] = pad_words(batch_data["sentence1_word"])
             batch_data["sentence2_word"] = pad_words(batch_data["sentence2_word"])
-            print(batch_data["sentence1_word"].shape)
+            # print(batch_data["sentence1_word"].shape)
 
             ################## Characters process #####################
             def pad_chars(sentence_char):
@@ -125,9 +126,10 @@ def train_snli():
                 batch_data["sentence2_char"],
                 premise_pos, hypothesis_pos,
                 premise_exact_match, hypothesis_exact_match,
-                is_train, dropout_p)
-            
-
+                is_train)
+            print(debug, file=snli_log)
+            print(debug)
+            print(current_batch)
             if current_batch % report_interval == 0:
                 # save model
                 saver.save(sess, ckpt_path, global_step=global_step)
