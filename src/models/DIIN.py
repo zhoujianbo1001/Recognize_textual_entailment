@@ -14,6 +14,8 @@ import modules.relation_network as rn
 import modules.fcn as fcn
 import params
 
+from tensorflow.python import debug as tfdbg
+
 CONFIGS = params.load_configs()
 
 class DIIN(object):
@@ -83,7 +85,6 @@ class DIIN(object):
             hypothesis_in = hn.highway_network(
                 hypothesis_in, CONFIGS.hn_num_layers,
                 CONFIGS.hn_out_size, is_train, CONFIGS.hn_dropout_kp, CONFIGS.weight_decay)
-        self.debug = premise_in
         # self attention
         with tf.variable_scope("self_attention") as scope:
             for i in range(CONFIGS.self_attention_layers):
@@ -97,7 +98,7 @@ class DIIN(object):
                     scope="hypo_self_att_layer_{}".format(i))
         
         
-        fcn_out, fcn_in = apply_fcn(is_train, premise_in, hypothesis_in)
+        fcn_out, self.fcn_in = apply_fcn(is_train, premise_in, hypothesis_in)
         # dn_out, dn_in = apply_dense_net(premise_in, hypothesis_in)
         # self.debug = dn_in
         # self.debug = fcn_out
@@ -137,20 +138,22 @@ class DIIN(object):
     def build_train_op(
         self, opt=None, lr=1e-3, 
         gradient_clip_val=1, global_step=None):
-        if opt is None:
-            opt = tf.train.AdamOptimizer(lr)
-            # opt = tf.train.AdadeltaOptimizer(lr)
+        grad_debugger = tfdbg.GradientsDebugger()
+        debug_losses = grad_debugger.identify_gradient(self.losses)
+        with grad_debugger:
+            if opt is None:
+                opt = tf.train.AdamOptimizer(lr)
+                # opt = tf.train.AdadeltaOptimizer(lr)
         
-        if global_step is None:
-            self.global_step = tf.Variable(0, name='global_step', trainable=False)
+            if global_step is None:
+                self.global_step = tf.Variable(0, name='global_step', trainable=False)
 
-        tvars = tf.trainable_variables()
-        print(tf.gradients(self.losses, tvars))
-        grads, global_norm = tf.clip_by_global_norm(tf.gradients(self.losses, tvars), gradient_clip_val)
-        self.debug = global_norm
-        self.train_op = opt.apply_gradients(zip(grads, tvars), global_step=self.global_step)
-
-        # self.train_op = opt.minimize(self.losses, global_step=global_step)
+            tvars = tf.trainable_variables()
+            grads = tf.gradients(self.losses, tvars)
+            # grads, global_norm = tf.clip_by_global_norm(tf.gradients(self.losses, tvars), gradient_clip_val)
+            self.train_op = opt.apply_gradients(zip(grads, tvars), global_step=self.global_step)
+        self.debug = grad_debugger.gradient_tensor(self.fcn_in)
+            # self.train_op = opt.minimize(self.losses, global_step=global_step)
 
     def update(
         self, sess, label_y,
@@ -241,7 +244,7 @@ def apply_fcn(is_train, premise_in, hypothesis_in):
     # [batch_size, 4*dim]
     fcn_in = tf.concat([prem_max, hyp_max, prem_mean, hyp_mean], 1)
 
-    fcn_in = tf.contrib.layers.layer_norm(fcn_in)
+    # fcn_in = tf.contrib.layers.layer_norm(fcn_in)
     fcn_out = fcn.multi_denses(
         fcn_in, CONFIGS.fcn_out_size, CONFIGS.fcn_num_layers, 
         is_train=is_train, weight_decay=CONFIGS.weight_decay,
@@ -399,7 +402,7 @@ if __name__ == "__main__":
                 is_train)
             #print("debug_mean", np.mean(debug, -1))
             #print("debug_var", np.var(debug, -1))
-            print(len(debug))
+            # print(len(debug))
             print(debug, file=model_log)
             print("losses:", losses, file=model_log)
             print("losses:", losses)
