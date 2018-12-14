@@ -169,7 +169,7 @@ def encode_snli(
     def encode_sentence(sentence):
         sent_word_list = list()
         sent_char_list = list()
-        for i, word in enumerate(nltk.word_tokenize(elem["sentence1"].lower())):
+        for i, word in enumerate(nltk.word_tokenize(sentence.lower())):
             # encode word embedding
             try:
                 sent_word_list.append(words_dict[word])
@@ -210,6 +210,6 @@ def encode_snli(
 
 
 if __name__ == '__main__':
-    create_embedding_and_dict()
-    create_chars_dict()
+    # create_embedding_and_dict()
+    # create_chars_dict()
     encode_snli()

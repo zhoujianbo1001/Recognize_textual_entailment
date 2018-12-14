@@ -14,35 +14,10 @@ import params
 CONFIGS = params.load_configs()
 
 ############################
-# train params
-epoch = 10000
-batch_size = 60
 is_train = True
-dropout_p = 0.8
-
-report_interval = 50
 
 ckpt_path = CURRENT_PATH+"/ckpt/snli.ckpt"
 ckpt_dir = CURRENT_PATH+"/ckpt"
-
-############################
-# model params
-emb_train=True
-embeddings=None
-vocab_size=100 ##
-emb_dim=50 ##
-chars_vocab_size=50 ##
-chars_emb_dim=50 ##
-filters_out_channels=[100]
-filters_width=[5]
-char_out_size=100
-weight_decay=0.0
-highway_num_layers=2
-self_attention_layers=1
-label_size=4
-
-seq_len=48
-chars_len=16
 
 def train_snli():
     snli_log = open(CURRENT_PATH+"/train_snli.log", 'w')
@@ -72,51 +47,36 @@ def train_snli():
             print("Checkpoint does't exist.")
             sess.run(tf.global_variables_initializer())
         # read data set
-        data_obj = read_data(snli_dev_path)
+        data_obj = read_data(snli_train_path)
 
         current_epoch = 0
         current_batch = 0
         total_losses = 0
-        while(current_epoch < epoch):
+        num_clipped_seq = 0
+        num_clipped_chars = 0
+        while(current_epoch < CONFIGS.epoch):
             # read batch data
-            batch_data, read_end = read_batch_data(data_obj, batch_size)
+            batch_data, read_end, read_batch, clipped_seq, clipped_chars = read_batch_data(
+                data_obj, CONFIGS.batch_size, seq_len=CONFIGS.seq_len, chars_len=CONFIGS.chars_len)
+            num_clipped_seq += clipped_seq
+            num_clipped_chars += clipped_chars
             if read_end:
                 current_epoch += 1
                 current_batch = 0
+                num_clipped_seq = 0
+                num_clipped_chars = 0
             else:
                 current_batch += 1
+
+            if read_batch == 0:
+                continue
+
             ###########################
-            premise_pos = np.random.randint(low=0, high=100, size=(batch_size, 10, 47), dtype=np.int32)
-            hypothesis_pos = np.random.randint(low=0, high=100, size=(batch_size, 10, 47), dtype=np.int32)
-            premise_exact_match = np.random.randint(low=0, high=2, size=(batch_size, 10, 1), dtype=np.int32)
-            hypothesis_exact_match = np.random.randint(low=0, high=2, size=(batch_size, 10,1), dtype=np.int32)
+            premise_pos = np.random.randint(low=0, high=100, size=(CONFIGS.batch_size, 10, 47), dtype=np.int32)
+            hypothesis_pos = np.random.randint(low=0, high=100, size=(CONFIGS.batch_size, 10, 47), dtype=np.int32)
+            premise_exact_match = np.random.randint(low=0, high=2, size=(CONFIGS.batch_size, 10, 1), dtype=np.int32)
+            hypothesis_exact_match = np.random.randint(low=0, high=2, size=(CONFIGS.batch_size, 10,1), dtype=np.int32)
             #############################
-
-            ################## Words processing ######################
-            def pad_words(sentence_word):
-                if sentence_word.shape[-1] < seq_len:
-                    pad_len = seq_len-sentence_word.shape[-1]
-                    sentence_word = np.pad(
-                        sentence_word, ((0,0),(0,pad_len)), 
-                        "constant")
-                return sentence_word
-
-            batch_data["sentence1_word"] = pad_words(batch_data["sentence1_word"])
-            batch_data["sentence2_word"] = pad_words(batch_data["sentence2_word"])
-            # print(batch_data["sentence1_word"].shape)
-
-            ################## Characters process #####################
-            def pad_chars(sentence_char):
-                if sentence_char.shape[-1] < chars_len:
-                    pad_word = seq_len - sentence_char.shape[1]
-                    pad_char = chars_len - sentence_char.shape[-1]
-                    sentence_char = np.pad(
-                        sentence_char, ((0,0),(0,pad_word),(0,pad_char)), 
-                        "constant", constant_values=(0,0))
-                return sentence_char
-
-            batch_data["sentence1_char"] = pad_chars(batch_data["sentence1_char"])
-            batch_data["sentence2_char"] = pad_chars(batch_data["sentence2_char"])
 
             losses, predict, global_step, debug = diin.update(
                 sess, batch_data["label"],
@@ -127,10 +87,16 @@ def train_snli():
                 premise_pos, hypothesis_pos,
                 premise_exact_match, hypothesis_exact_match,
                 is_train)
-            print(debug, file=snli_log)
-            print(debug)
-            print(current_batch)
-            if current_batch % report_interval == 0:
+
+            # print(debug, file=snli_log)
+            # print(debug[0]-debug[1], file=snli_log)
+            # print(np.sum(debug[0]-debug[1], -1), file=snli_log)
+            # print(np.sum(debug, -1), file=snli_log)
+            # print(np.mean(debug, -1), file=snli_log)
+            # print(np.var(debug, -1), file=snli_log)
+            # print(np.max(debug, -1), file=snli_log)
+            # print(np.min(debug, -1), file = snli_log)
+            if current_batch % CONFIGS.report_interval == 0:
                 # save model
                 saver.save(sess, ckpt_path, global_step=global_step)
 
@@ -143,7 +109,9 @@ def train_snli():
                 average_recall = np.mean(recall)
                 f1 = sl.metrics.f1_score(batch_data["label"],predict_label, average='micro')
                 average_f1 = np.mean(f1)
-                mean_losses = total_losses / report_interval
+                mean_losses = total_losses / CONFIGS.report_interval
+                print("num_clipped_seq: {0}, num_clipped_chars: {1}".format(num_clipped_seq, num_clipped_chars),
+                    file=snli_log)
                 print("Epoch_idx: {0}, Batch_idx: {1}, Mean_losses: {2}".format(current_epoch, current_batch, mean_losses))
                 print("Accuracy: {:.2f}, Precise: {:.2f}, Recall: {:.2f}, F1: {:.2f}".format(average_accuracy, average_precise, average_recall, average_f1))
                 print(

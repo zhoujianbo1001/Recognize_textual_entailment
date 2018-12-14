@@ -11,14 +11,21 @@ import json
 parser = argparse.ArgumentParser()
 
 # Add training params
+parser.add_argument("--epoch", type=int, default=100)
+parser.add_argument("--batch_size", type=int, default=60)
 parser.add_argument("--lr", type=float, default=1e-4)
+
+parser.add_argument("--report_interval", type=int, default=50)
 
 # Add model params
 # Regularization
 parser.add_argument("--weight_decay", type=float, default=0.0)
+
 # input params
 parser.add_argument("--seq_len", type=int, default=48)
 parser.add_argument("--chars_len", type=int, default=16)#optional
+
+parser.add_argument("--label_size", type=int, default=4)
 # word embedding params
 parser.add_argument("--emb_dropout_kp", type=float, default=1.0)
 parser.add_argument("--emb_train", type=bool, default=True)
@@ -46,12 +53,11 @@ parser.add_argument("--self_attention_layers", type=int, default=1)
 parser.add_argument("--func_self_att", type=str, default="dot-product")
 # optional params: fully connected network
 parser.add_argument("--use_fcn", type=bool, default=True)
-parser.add_argument("--fcn_out_size", type=int, default=3)
-parser.add_argument("--fcn_num_layers", type=int, default=2)
+parser.add_argument("--fcn_num_layers", type=int, default=3)
+parser.add_argument("--fcn_func_activation", type=str, default="relu")
 parser.add_argument("--fcn_dropout_kp", type=float, default=1.0)
 # optional params: dense network params
 parser.add_argument("--use_dn", type=bool, default=False)
-parser.add_argument("--dn_out_size", type=bool, default=3)
 parser.add_argument("--dn_first_scale_down_ratio", type=float, default=1.0)
 parser.add_argument("--dn_first_scale_down_filter", type=int , default=1)
 parser.add_argument("--dn_num_blocks", type=int, default=3)
