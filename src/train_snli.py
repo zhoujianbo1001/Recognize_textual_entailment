@@ -5,30 +5,26 @@ CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
 import tensorflow as tf
 import numpy as np
 import sklearn as sl
-from models.DIIN import DIIN
-from utils.read_data import read_embedding_table, read_data, read_batch_data,\
-snli_train_path, snli_dev_path, snli_test_path, read_vocab_size, read_chars_vocab_size
 
-import params
+from models.DIIN import DIIN
+from utils.read_data import read_embedding_table, read_data, read_batch_data
+from test_snli import dev_func
+
+import utils.params as params
 
 CONFIGS = params.load_configs()
 
 ############################
 is_train = True
 
-ckpt_path = CURRENT_PATH+"/ckpt/snli.ckpt"
-ckpt_dir = CURRENT_PATH+"/ckpt"
+ckpt_path = CONFIGS.ckpt_path
+ckpt_dir = CONFIGS.ckpt_dir
 
 def train_snli():
     snli_log = open(CURRENT_PATH+"/train_snli.log", 'w')
 
     # create compute graph.
     embeddings = read_embedding_table()
-    vocab_size = embeddings.shape[0]# Don't include PADDING and UNKNOWN
-    emb_dim = embeddings.shape[-1]
-
-    chars_vocab_size = read_chars_vocab_size()# Don't include PADDING
-    chars_emb_dim = emb_dim
 
     diin = DIIN(embeddings)
     diin.build_graph()
@@ -47,7 +43,7 @@ def train_snli():
             print("Checkpoint does't exist.")
             sess.run(tf.global_variables_initializer())
         # read data set
-        data_obj = read_data(snli_train_path)
+        data_obj = read_data(CONFIGS.train_path)
 
         current_epoch = 0
         current_batch = 0
@@ -61,10 +57,16 @@ def train_snli():
             num_clipped_seq += clipped_seq
             num_clipped_chars += clipped_chars
             if read_end:
+                # tag change
                 current_epoch += 1
                 current_batch = 0
-                num_clipped_seq = 0
+                num_clipped_seq = 0 
                 num_clipped_chars = 0
+                
+                # dev pragram
+                dev_obj = read_data(CONFIGS.dev_path)
+                accuracy_total = dev_func(sess, diin, dev_obj)
+                print("Dev accuracy: ", accuracy_total)
             else:
                 current_batch += 1
 
@@ -98,7 +100,7 @@ def train_snli():
             # print(np.min(debug, -1), file = snli_log)
             if current_batch % CONFIGS.report_interval == 0:
                 # save model
-                saver.save(sess, ckpt_path, global_step=global_step)
+                saver.save(sess, ckpt_path)
 
                 predict_label = np.argmax(predict, axis=-1)
                 accuracy = sl.metrics.accuracy_score(batch_data["label"], predict_label)
@@ -122,6 +124,7 @@ def train_snli():
                     file=snli_log)
 
                 total_losses = 0
+
             else:
                 total_losses += losses
 

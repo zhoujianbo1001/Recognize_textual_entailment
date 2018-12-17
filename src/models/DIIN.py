@@ -12,7 +12,7 @@ import modules.attention as attention
 import modules.dense_net as dn
 import modules.relation_network as rn
 import modules.fcn as fcn
-import params
+import utils.params as params
 
 CONFIGS = params.load_configs()
 

@@ -226,7 +226,7 @@ if __name__ == "__main__":
     num_clipped_chars = 0
     while(read_end == False):
         batch_i += 1
-        batch_data, read_end, num_clipped_s, num_clipped_c = read_batch_data(
+        batch_data, read_end, _, num_clipped_s, num_clipped_c = read_batch_data(
             data_obj, batch_size=3, seq_len=58, chars_len=16)
         num_clipped_seq += num_clipped_s
         num_clipped_chars += num_clipped_c
