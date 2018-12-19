@@ -1,38 +1,42 @@
 # -*- coding: UTF-8 -*-
-
+import importlib
 import sys
 import os
-CURRENT_PAHT = os.path.dirname(__file__)
+CURRENT_PATH = os.path.abspath(__file__)
+CURRENT_DIR = os.path.dirname(CURRENT_PATH)
+sys.path.append(os.path.dirname(CURRENT_DIR))
+
 import json
 import nltk
 from tqdm import tqdm
 
-DATA_PATH = os.path.dirname(os.path.dirname(CURRENT_PAHT))+"/data"
-mul_snli_jsonl = [
-    DATA_PATH+"/snli_1.0/snli_1.0_train.jsonl",
-    DATA_PATH+"/snli_1.0/snli_1.0_dev.jsonl",
-    DATA_PATH+"/snli_1.0/snli_1.0_test.jsonl"
+import utils.params as params
+
+CONFIGS = params.load_configs()
+
+wordvec_file = CONFIGS.wordvec_file
+num_words = CONFIGS.num_wordvec
+
+mul_data_jsonl = [
+    CONFIGS.train_raw_path,
+    CONFIGS.dev_raw_path,
+    CONFIGS.test_raw_path
 ]
 num_lines_list = [
-    550152, 
-    10000, 
-    10000
+    CONFIGS.num_train_data,
+    CONFIGS.num_dev_data,
+    CONFIGS.num_test_data
 ]
 
-wordvec_file = DATA_PATH+"/glove.6B/glove.6B.50d.txt"
-num_words = 400000
+words_embedding_file = CONFIGS.words_embedding_file
+words_dict_file = CONFIGS.words_dict_file
+chars_dict_file = CONFIGS.chars_dict_file
 
-DATA_PROCESSED_PATH = DATA_PATH+"/data_processed"
-
-words_dict_file = DATA_PROCESSED_PATH+"/words_dictionary.txt"
-words_embedding_file = DATA_PROCESSED_PATH+"/words_embedding.txt"
-mul_snli_jsonl_encoded = [
-    DATA_PROCESSED_PATH+"/snli_train_encoded.jsonl",
-    DATA_PROCESSED_PATH+"/snli_dev_encoded.jsonl",
-    DATA_PROCESSED_PATH+"/snli_test_encoded.jsonl"
+mul_data_jsonl_encoded = [
+    CONFIGS.train_encoded_path,
+    CONFIGS.dev_encoded_path,
+    CONFIGS.test_encoded_path
 ]
-chars_dict_file = DATA_PROCESSED_PATH+"/chars_dictionary.txt"
-
 
 def read_pretrain_wordvec(wordvec_file=wordvec_file, num_words=num_words):
     """
@@ -84,21 +88,21 @@ def read_chars_dict(chars_dict_file=chars_dict_file):
     return chars_dict
 
 
-def load_words_set(mul_snli_jsonl=mul_snli_jsonl, num_lines_list=num_lines_list):
+def load_words_set(mul_data_jsonl=mul_data_jsonl, num_lines_list=num_lines_list):
     """
     Create words dictionary.
     Params:
-        mul_snli_jsonl: the list of train, dev and test file.
+        mul_data_jsonl: the list of train, dev and test file.
     Returns:
-        words_set: the words set which contain all words occured in snli.
+        words_set: the words set which contain all words occured in data.
     """
     words_set = set()
 
     files_list = list()
-    for i in range(len(mul_snli_jsonl)):
-        file_obj = open(mul_snli_jsonl[i],'r')
+    for i in range(len(mul_data_jsonl)):
+        file_obj = open(mul_data_jsonl[i],'r')
         files_list.append(file_obj)
-    for i, file_obj in tqdm(enumerate(files_list), desc="Read snli file", total=len(files_list)):
+    for i, file_obj in tqdm(enumerate(files_list), desc="Read data file", total=len(files_list)):
         for j, elem in tqdm(enumerate(file_obj), desc="Read one of file", total=num_lines_list[i]):
             elem = json.loads(elem)
             for p, word in enumerate(nltk.word_tokenize(elem["sentence1"].lower())):
@@ -110,18 +114,18 @@ def load_words_set(mul_snli_jsonl=mul_snli_jsonl, num_lines_list=num_lines_list)
 
 
 def create_embedding_and_dict(
-    wordvec_file=wordvec_file, mul_snli_jsonl=mul_snli_jsonl, 
+    wordvec_file=wordvec_file, mul_data_jsonl=mul_data_jsonl, 
     words_embedding_file=words_embedding_file, words_dict_file=words_dict_file):
     """
     Create words embedding table file.
     Params:
         wordvec_file: the pretrain wordvec file path.
-        mul_snli_jsonl: the list of train, dev and test file.
+        mul_data_jsonl: the list of train, dev and test file.
         words_embedding_file: the words embedding table file path that will create.
         words_dict_file: the words dictionary file path that will create.
     """
     wordvecs_dict = read_pretrain_wordvec(wordvec_file)
-    words_set = load_words_set(mul_snli_jsonl)
+    words_set = load_words_set(mul_data_jsonl)
 
     words_embedding_obj = open(words_embedding_file, "w")
     words_dict_obj = open(words_dict_file, "w")
@@ -140,14 +144,14 @@ def create_embedding_and_dict(
     print("KeyError size is {}.".format(len(keys_set)))
         
 
-def create_chars_dict(mul_snli_jsonl=mul_snli_jsonl, chars_dict_file=chars_dict_file):
+def create_chars_dict(mul_data_jsonl=mul_data_jsonl, chars_dict_file=chars_dict_file):
     """
     Create characters dictionary file.
     Params:
-        mul_snli_jsonl: the list of train, dev and test file.
+        mul_data_jsonl: the list of train, dev and test file.
         chars_dict_file: the characters dictionary file path which will create.
     """
-    words_set = load_words_set(mul_snli_jsonl)
+    words_set = load_words_set(mul_data_jsonl)
     chars_set = set()
     for word in tqdm(words_set, total=len(words_set), desc="Create characters dict"):
         for char in word:
@@ -159,8 +163,8 @@ def create_chars_dict(mul_snli_jsonl=mul_snli_jsonl, chars_dict_file=chars_dict_
         chars_dict_obj.write(char+'\n')
 
 
-def encode_snli(
-    mul_snli_jsonl=mul_snli_jsonl, mul_snli_jsonl_encoded=mul_snli_jsonl_encoded, 
+def encode_data(
+    mul_data_jsonl=mul_data_jsonl, mul_data_jsonl_encoded=mul_data_jsonl_encoded, 
     words_dict_file=words_dict_file, chars_dict_file=chars_dict_file, num_lines_list=num_lines_list):
     # read words dictionary
     words_dict = read_words_dict(words_dict_file)
@@ -185,14 +189,14 @@ def encode_snli(
 
         return sent_word_list, sent_char_list
 
-    # open snli file
+    # open data file
     files_list = list()
-    for i in range(len(mul_snli_jsonl)):
-        file_obj = open(mul_snli_jsonl[i],'r')
+    for i in range(len(mul_data_jsonl)):
+        file_obj = open(mul_data_jsonl[i],'r')
         files_list.append(file_obj)
 
-    for i, file_obj in tqdm(enumerate(files_list), desc="Begin encoding snli", total=len(files_list)):
-        encoded_file = open(mul_snli_jsonl_encoded[i], 'w')
+    for i, file_obj in tqdm(enumerate(files_list), desc="Begin encoding data", total=len(files_list)):
+        encoded_file = open(mul_data_jsonl_encoded[i], 'w')
         # entailment = 0, contradiction = 1, neutral = 2, - = 3
         label_list = ["entailment","contradiction","neutral","-"]
         for j, line in tqdm(enumerate(file_obj), desc="Encoding {}st file".format(i+1), total=num_lines_list[i]):
@@ -210,6 +214,6 @@ def encode_snli(
 
 
 if __name__ == '__main__':
-    # create_embedding_and_dict()
-    # create_chars_dict()
-    encode_snli()
+    create_embedding_and_dict()
+    create_chars_dict()
+    encode_data()

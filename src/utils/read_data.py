@@ -1,25 +1,26 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
-CURRENT_PATH = os.path.dirname(__file__)
-sys.path.append(os.path.dirname(CURRENT_PATH))
+CURRENT_PATH = os.path.abspath(__file__)
+CURRENT_DIR = os.path.dirname(CURRENT_PATH)
+sys.path.append(os.path.dirname(CURRENT_DIR))
+
 import numpy as np
 import json
 import random
-from utils.data_process import read_chars_dict, read_words_dict, mul_snli_jsonl_encoded, words_embedding_file
 
+from utils.data_process import read_chars_dict, read_words_dict
+import utils.params as params
 
-snli_train_path = mul_snli_jsonl_encoded[0]
-snli_dev_path = mul_snli_jsonl_encoded[1]
-snli_test_path = mul_snli_jsonl_encoded[2]
+CONFIGS = params.load_configs()
 
-
+@DeprecationWarning
 def read_vocab_size():
     """Don't include PADDING and UNKNOWN"""
     words_dict = read_words_dict()
     return len(words_dict)
 
-
+@DeprecationWarning
 def read_chars_vocab_size():
     """Don't include PADDING"""
     chars_dict = read_chars_dict()
@@ -32,7 +33,7 @@ def read_embedding_table():
     Notes:
         Don't include PADDING and UNKNOWN.
     """
-    embedding_obj = open(words_embedding_file, 'r')
+    embedding_obj = open(CONFIGS.words_embedding_file, 'r')
     embedding_table = []
     for i, emb in enumerate(embedding_obj):
         embedding_table.append(eval(emb))
@@ -219,7 +220,7 @@ def read_batch_data(data_obj, batch_size, seq_len=None, chars_len=None):
     
 
 if __name__ == "__main__":
-    data_obj = read_data(snli_dev_path)
+    data_obj = read_data(CONFIGS.dev_encoded_path)
     read_end = False
     batch_i = 0
     num_clipped_seq = 0

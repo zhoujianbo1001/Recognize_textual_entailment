@@ -1,10 +1,10 @@
 data/*
-!data/download_data.py
+!data/required_download_data.py
+
+ckpt/snli/*
+
+snli_saved_model/*
+
 src/**/__pycache__/*
-src/**/data/*
-!src/**/data/download_data.py
-src/**/ckpt/*
-!src/**/ckpt/.gitignore
 src/**/*.log
 src/**/*.swp
-src/test_model

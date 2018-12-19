@@ -2,8 +2,9 @@
 
 import sys
 import os
-CURRENT_PATH = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(os.path.dirname(CURRENT_PATH))
+CURRENT_PATH = os.path.abspath(__file__)
+CURRENT_DIR = os.path.dirname(CURRENT_PATH)
+sys.path.append(os.path.dirname(CURRENT_DIR))
 import tensorflow as tf
 import modules.general as general
 import modules.cnn as cnn
