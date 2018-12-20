@@ -91,5 +91,5 @@ def test_data(data_path):
         print("Dev accuracy: ", accuracy_total)
 
 if __name__ == "__main__":
-    # test_data(CONFIGS.train_encoded_path)
+    test_data(CONFIGS.train_encoded_path)
     test_data(CONFIGS.dev_encoded_path)

@@ -1,7 +1,7 @@
 data/*
 !data/required_download_data.py
 
-ckpt/snli/*
+ckpt/*
 
 snli_saved_model/*
 
