@@ -9,7 +9,7 @@ import tensorflow as tf
 import numpy as np
 import sklearn as sl
 
-from models.DIIN import DIIN
+from models.DIIN import DIIN, debug_func
 from utils.read_data import read_embedding_table, read_data, read_batch_data
 from test_data import dev_func
 
@@ -104,10 +104,15 @@ def train_data():
                 num_clipped_seq = 0 
                 num_clipped_chars = 0
                 
-                # dev pragram
+                # dev data
                 dev_obj = read_data(CONFIGS.dev_path)
                 accuracy_total = dev_func(sess, diin, dev_obj)
                 print("Dev accuracy: ", accuracy_total, file=train_log)
+                print("Dev accuracy: ", accuracy_total)
+                # train data
+                accuracy_total = dev_func(sess, diin, data_obj)
+                print("Train accuracy: ", accuracy_total, file=train_log)
+                print("Train accuracy: ", accuracy_total)
             else:
                 current_batch += 1
         
@@ -159,16 +164,6 @@ def save_model_for_test(model, sess, export_dir):
         sess, ["test_saved_model"],
         {"test_signature": signature})
     builder.save()
-
-def debug_func(debug, log_file):
-    print(debug, file=log_file)
-    print(debug[0]-debug[1], file=log_file)
-    print(np.sum(debug[0]-debug[1], -1), file=log_file)
-    print(np.sum(debug, -1), file=log_file)
-    print(np.mean(debug, -1), file=log_file)
-    print(np.var(debug, -1), file=log_file)
-    print(np.max(debug, -1), file=log_file)
-    print(np.min(debug, -1), file = log_file)
 
 if __name__ == "__main__":
     train_data()

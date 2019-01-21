@@ -55,6 +55,8 @@ snli_chars_size = 60
 multiNLI_chars_size = 0 #
 snli_multiNLI_chars_size = 0 #
 
+EMB_DIM = 300
+
 parser = argparse.ArgumentParser()
 
 ##################################################################
@@ -111,15 +113,15 @@ parser.add_argument("--chars_len", type=int, default=16)#optional
 
 parser.add_argument("--label_size", type=int, default=4)
 # word embedding params
-parser.add_argument("--emb_dropout_kp", type=float, default=1.0)
+parser.add_argument("--emb_dropout_kp", type=float, default=0.7)
 parser.add_argument("--emb_train", type=bool, default=True)
 parser.add_argument("--vocab_size", type=int, default=snli_vocab_size)# Don't include PADDING and UNKNOWN
-parser.add_argument("--emb_dim", type=int, default=300)#
+parser.add_argument("--emb_dim", type=int, default=EMB_DIM)#
 # optional params: characters embedding params
 parser.add_argument("--use_char_emb", type=bool, default=False)
 parser.add_argument("--chars_dropout_kp", type=float, default=0.8)
 parser.add_argument("--chars_vocab_size", type=int, default=snli_chars_size)# Don't include PADDING
-parser.add_argument("--chars_emb_dim", type=int, default=50)#
+parser.add_argument("--chars_emb_dim", type=int, default=EMB_DIM)#
 parser.add_argument("--chars_filters_out_channels", type=list, default=[100])#
 parser.add_argument("--chars_filters_width", type=list, default=[5])#
 parser.add_argument("--chars_out_size", type=int, default=100)#
@@ -129,8 +131,8 @@ parser.add_argument("--use_pos", type=bool, default=False)
 parser.add_argument("--use_em", type=bool, default=False)
 # highway network params
 parser.add_argument("--hn_num_layers", type=int, default=1)
-parser.add_argument("--hn_dropout_kp", type=float, default=1.0)
-parser.add_argument("--hn_out_size", type=int, default=50)
+parser.add_argument("--hn_dropout_kp", type=float, default=0.7)
+parser.add_argument("--hn_out_size", type=int, default=EMB_DIM)
 # optional params: self attention params
 parser.add_argument("--use_self_att", type=bool, default=True)
 parser.add_argument("--self_attention_layers", type=int, default=1)
@@ -150,8 +152,10 @@ parser.add_argument("--dn_num_block_layers", type=int, default=8)
 parser.add_argument("--dn_filter_height", type=int, default=3)
 parser.add_argument("--dn_filter_width", type=int, default=3)
 parser.add_argument("--dn_transition_rate", type=float, default=0.5)
+parser.add_argument("--dn_dropout_kp", type=float, default=0.7)
 # optional params: relational network params
 parser.add_argument("--use_rn", type=bool, default=False)
+parser.add_argument("--rn_dropout_kp", type=float, default=1.0)
 
 def load_configs():
     args = parser.parse_args()

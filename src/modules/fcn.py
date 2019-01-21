@@ -21,6 +21,7 @@ def multi_denses(
         for i in range(num_layers):
             if i == num_layers-1:
                 units = out_size
+                activation = None # the final activation is None
             # inputs = tf.cond(tf.equal(is_train, True), lambda: tf.nn.dropout(inputs, dropout_p), lambda: inputs)
             inputs = tf.layers.dense(
                 inputs, units, activation, use_bias=True, 

@@ -30,20 +30,23 @@ def dense_net(
             # [batch_size, height, width, in_channels + num_block_layers*grow_rate]
             feature_map = dense_block(
                 feature_map, grow_rate, num_block_layers, filter_height, filter_width, 
-                weight_decay=weight_decay, scope="block_{}".format(i))
-            # [batch_size, height-ksize+1, width-ksize+1, in_channels*trasition_rate]
+                padding="SAME", weight_decay=weight_decay, scope="block_{}".format(i))
+            feature_map = tf.contrib.layers.layer_norm(feature_map)
+            # [batch_size, int(height/2), int(width/2), in_channels*trasition_rate]
             feature_map = dense_transition_layer(
                 feature_map, transition_rate, weight_decay=weight_decay, scope="transition_{}".format(i))
-
+        
         feature_shape = feature_map.get_shape().as_list()
         feature_map = tf.reshape(feature_map, [-1, feature_shape[1]*feature_shape[2]*feature_shape[3]])
+        feature_map = tf.contrib.layers.layer_norm(feature_map)
+        
         outs = tf.layers.dense(
-            feature_map, out_size, activation=tf.nn.relu, use_bias=False,
+            feature_map, out_size, use_bias=False,
             kernel_initializer=tf.glorot_normal_initializer(),
             kernel_regularizer=lambda x: weight_decay*tf.nn.l2_loss(x))
-        
+        debug = outs
 
-        return outs
+        return outs, debug
 
 def dense_block(
     feature_map, grow_rate, num_layers, filter_height, filter_width, 
@@ -60,11 +63,11 @@ def dense_block(
             ft = tf.nn.conv2d(features, filter, [1,1,1,1], padding=padding)
             feature_list.append(ft)
             features = tf.concat(feature_list, axis = -1)
+            # print(features)
             in_channels=features.get_shape().as_list()[-1]
         
         return features
             
-
 def dense_transition_layer(
     feature_map, transition_rate, weight_decay=0.0, scope="transition_layer"):
     with tf.variable_scope(scope):
@@ -75,7 +78,7 @@ def dense_transition_layer(
             initializer=tf.glorot_normal_initializer(),
             regularizer=lambda x: weight_decay*tf.nn.l2_loss(x))
         feature_map = tf.nn.conv2d(feature_map, filter, [1,1,1,1], padding="SAME")
-        feature_map = tf.nn.max_pool(feature_map, [1,2,2,1],[1,1,1,1], "VALID")
+        feature_map = tf.nn.max_pool(feature_map, [1,2,2,1],[1,2,2,1], "VALID")
 
         return feature_map
 
@@ -86,7 +89,7 @@ if __name__ == "__main__":
     first_scale_down_ratio=1.0
     first_scale_down_filter=1
     num_blocks=3
-    grow_rate=20
+    grow_rate=10
     num_block_layers=8
     filter_height=3
     filter_width=3

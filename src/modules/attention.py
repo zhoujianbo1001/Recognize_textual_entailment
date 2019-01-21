@@ -2,6 +2,28 @@ import tensorflow as tf
 
 VERY_NEGATIVE_NUMBER = -1e30
 
+def transformer_encoder(
+    inputs, output_size, number_layers=1, 
+    is_train=False, weight_decay=0.0, dropout_p=1.0,
+    scope="transformer_encoder"):
+    with tf.variable_scope("transformer_encoder"):
+        # [batch_size, seq_len, dim]
+        layer_inputs = inputs
+        for i in range(number_layers):
+            x = multi_head_attention(layer_inputs, layer_inputs)
+            x = tf.add(x, inputs)
+            x = tf.contrib.layers.layer_norm(x)
+            layer_inputs = x
+        
+        last_dense = tf.layers.dense(
+            layer_inputs, output_size, use_bias=False, 
+            kernel_initializer=tf.glorot_normal_initializer(),
+            kernel_regularizer=lambda x: weight_decay*tf.nn.l2_loss(x),
+            name="feed_forward")
+        
+        return last_dense
+
+
 def multi_head_attention(
     query, values, h=8, mask=None, func_att="dot-product", scaled=True,
     is_train=False, weight_decay=0.0, dropout_p=1.0,
@@ -36,8 +58,11 @@ def multi_head_attention(
         query = tf.concat(tf.split(query_dense, h, axis=-1), axis=0)
         # [h*batch_size, value_len, dim]
         values = tf.concat(tf.split(values_dense, h, axis=-1), axis=0)
-        
-        mask = tf.reshape(tf.tile(tf.expand_dims(mask, 0), [h, 1, 1]), [-1, mask.shape[-1]])
+        if mask != None:
+            mask = tf.reshape(
+                tf.tile(tf.expand_dims(mask, 0), [h, 1, 1]), 
+                [-1, mask.shape[-1]]
+            )
         # [h*batch_size, query_len, dim]
         multi_head = attention(
             query, values, mask=mask, func_att=func_att, scaled=scaled,
@@ -74,8 +99,6 @@ def multi_head_attention(
         # [batch_size, query_len, dim]
         outputs = position_wise_ffn(multi_head)
         return outputs
-        
-        
 
 def attention(
     query, values, mask=None, func_att="dot-product", scaled=True,
@@ -191,37 +214,6 @@ def apply_mask(val, mask, name="apply_mask"):
     """
     return tf.add(val, (1 - tf.cast(mask, 'float')) * VERY_NEGATIVE_NUMBER, name=name)
 
-# not use
-def fuse_gate(
-    input1, input2,
-    weight_decay=0.1,
-    is_train=False,
-    dropout_p=1.0,
-    scope="fuse_gate"):
-    with tf.variable_scope(scope):
-        dim = input1.shape[-1]
-        inputs = tf.concat([input1, input2], -1)
-        inputs = tf.cond(tf.equal(is_train, True), lambda: tf.nn.dropout(inputs, dropout_p), lambda: inputs)
-        z = tf.layers.dense(
-            inputs, dim, activation=tf.nn.tanh,
-            kernel_initializer=tf.glorot_normal_initializer(),
-            kernel_regularizer=lambda x: tf.nn.l2_loss(x), 
-            name="dense_z")
-        r = tf.layers.dense(
-            inputs, dim, activation=tf.nn.sigmoid,
-            kernel_initializer=tf.glorot_normal_initializer(),
-            kernel_regularizer=lambda x: tf.nn.l2_loss(x), 
-            name="dense_r")
-        f = tf.layers.dense(
-            inputs, dim, activation=tf.nn.sigmoid,
-            kernel_initializer=tf.glorot_normal_initializer(),
-            kernel_regularizer=lambda x: tf.nn.l2_loss(x), 
-            name="dense_f")
-        output = tf.multiply(r, input1) + tf.multiply(f,z)
-
-        return output
-
-
 if __name__ == "__main__":
     #[2, 4, 3]
     inputs = tf.constant(
@@ -265,10 +257,14 @@ if __name__ == "__main__":
         
     # test multi-head attention
     multi_head_out = multi_head_attention(inputs, inputs, mask=mask)
+
+    # test transformer_encoder
+    transformer_encoder_out = transformer_encoder(inputs, 4)
+
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         print(sess.run([att_out_1]))
         print(sess.run([att_out_2]))
         print(sess.run([att_out_3]))
         print(sess.run([multi_head_out]))
-    
+        print(sess.run([transformer_encoder_out]))

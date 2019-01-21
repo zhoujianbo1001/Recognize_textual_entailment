@@ -85,8 +85,6 @@ class DIIN(object):
             hypothesis_in = hn.highway_network(
                 hypothesis_in, CONFIGS.hn_num_layers,
                 CONFIGS.hn_out_size, is_train, CONFIGS.hn_dropout_kp, CONFIGS.weight_decay)
-        # self.debug = premise_in
-        # self.debug = hypothesis_in
 
         # self attention
         with tf.variable_scope("self_attention") as scope:
@@ -99,15 +97,17 @@ class DIIN(object):
                 hypothesis_in = attention.attention(
                     hypothesis_in, hypothesis_in, hyp_mask, "dot-product", False,
                     scope="hypo_self_att_layer_{}".format(i))
-        # self.debug = hypothesis_in
-        
-        fcn_out, self.fcn_in = apply_fcn(is_train, premise_in, hypothesis_in)
-        self.model_out = fcn_out        
-        self.debug = self.fcn_in
+        # premise_in = tf.contrib.layers.layer_norm(premise_in)
+        # hypothesis_in = tf.contrib.layers.layer_norm(hypothesis_in)
+
+        # fcn_out, fcn_in = apply_fcn(is_train, premise_in, hypothesis_in)
+        dn_out, dn_in, d = apply_dense_net(is_train, premise_in, hypothesis_in)
+        # rn_out = apply_relation_network(is_train, premise_in, hypothesis_in)
+        self.model_out = dn_out        
+        self.debug = d
 
         self.logits = tf.nn.softmax(self.model_out, axis=-1)
-        
-                                
+               
     def build_graph(self):
         self.prem_x = tf.placeholder(tf.int32, [None, CONFIGS.seq_len], name='premise')
         self.hyp_x = tf.placeholder(tf.int32, [None, CONFIGS.seq_len], name='hypothesis')
@@ -246,18 +246,19 @@ def apply_fcn(is_train, premise_in, hypothesis_in):
 
 def apply_relation_network(is_train, premise_in, hypothesis_in):
     rn_out = rn.relation_network(
-        premise_in, hypothesis_in, CONFIGS.rn_output_size,
-        is_train, CONFIGS.weight_decay, CONFIGS.rn_dropout_p)
+        premise_in, hypothesis_in, CONFIGS.label_size,
+        is_train, CONFIGS.weight_decay, CONFIGS.rn_dropout_kp)
     return rn_out
 
-def apply_dense_net(premise_in, hypothesis_in):
+def apply_dense_net(is_train, premise_in, hypothesis_in):
     premise_in = tf.expand_dims(premise_in, 2)
-    hypothesis_in = tf.expand_dims(hypothesis_in, 2)
-    premise_in = tf.tile(premise_in,[1,1,premise_in.shape[1], 1])
-    hypothesis_in = tf.tile(hypothesis_in, [1,1,hypothesis_in.shape[1],1])
-
+    hypothesis_in = tf.expand_dims(hypothesis_in, 1)
+    premise_in = tf.tile(premise_in,[1,1,hypothesis_in.shape[2], 1])
+    hypothesis_in = tf.tile(hypothesis_in, [1,premise_in.shape[1], 1, 1])
+    
     dn_in = tf.multiply(premise_in, hypothesis_in)
-    dn_out = dn.dense_net(
+    
+    dn_out, debug = dn.dense_net(
         inputs=dn_in, 
         out_size=CONFIGS.label_size, 
         first_scale_down_ratio=CONFIGS.dn_first_scale_down_ratio,
@@ -268,99 +269,120 @@ def apply_dense_net(premise_in, hypothesis_in):
         filter_height=CONFIGS.dn_filter_height,
         filter_width=CONFIGS.dn_filter_width,
         transition_rate=CONFIGS.dn_transition_rate,
+        is_train=is_train,
+        weight_decay=CONFIGS.weight_decay,
+        dropout_p=CONFIGS.dn_dropout_kp,
         scope="dense_net"
     )
-    return dn_out, dn_in
+    return dn_out, dn_in, debug
+
+def debug_func(debug, log_file):
+    print("debug.shape: \n", debug.shape, file=log_file)
+    print("debug: \n", debug, file=log_file)
+    print("debug[0]-debug[1]: \n", debug[0]-debug[1], file=log_file)
+    print("np.sum(debug[0]-debug[1], -1): \n", np.sum(debug[0]-debug[1], -1), file=log_file)
+    print("np.sum(debug, -1): \n", np.sum(debug, -1), file=log_file)
+    print("np.mean(debug, -1): \n", np.mean(debug, -1), file=log_file)
+    print("np.var(debug, -1): \n", np.var(debug, -1), file=log_file)
+    print("np.max(debug, -1): \n", np.max(debug, -1), file=log_file)
+    print("np.min(debug, -1): \n", np.min(debug, -1), file = log_file)
 
 import numpy as np
 if __name__ == "__main__":
-    a_little_data = open(sys.path[0]+"/a_little_data.txt", 'r')
-    is_word = False
-    is_char = False
-    is_label = False
-    word_dict = {}
-    char_dict = {}
-    label_y = []
-    premise = []
-    hypothesis = []
-    premise_x = []
-    hypothesis_x = []
-    tag = 0
-    for line in a_little_data:
+    def process_little_data():
+        a_little_data = open(sys.path[0]+"/a_little_data.txt", 'r')
+        is_word = False
+        is_char = False
+        is_label = False
+        word_dict = {}
+        char_dict = {}
+        label_y = []
+        premise = []
+        hypothesis = []
+        premise_x = []
+        hypothesis_x = []
+        tag = 0
+        for line in a_little_data:
+            
+            if line.strip("\n") == "WORD_DICT":
+                is_word = True
+                is_char = False
+                is_label = False
+                continue
+            if line.strip("\n") == "CHAR_DICT":
+                is_char = True
+                is_word = False
+                is_label = False
+                continue
+            if line.strip("\n") == "DATA":
+                is_char = False
+                is_label = True
+                is_word = False
+                continue
+
+            if is_word and line != "\n":
+                word_dict[line.split(" ")[0]] = int(line.split(" ")[1])
+            if is_char and line != "\n":
+                char_dict[line.split(" ")[0]] = int(line.split(" ")[1])
+            if is_label and line != "\n":
+                if tag%5 == 0:
+                    label_y.append(int(line.split(" ")[1]))
+                elif tag%5 == 1:
+                    premise.append(line.strip("\n"))
+                elif tag%5 == 2:
+                    hypothesis.append(line.strip("\n"))
+                elif tag%5 == 3:
+                    premise_x.append(eval(line))
+                else:
+                    hypothesis_x.append(eval(line))
+                tag += 1
+
+        premise_char = []  
+        # premise_char
+        for line in premise:
+            words_list = []
+            for word in line.split(' '):
+                chars_list = []
+                for char in word:
+                    chars_list.append(char_dict[char.lower()])
+                if len(chars_list) < 16:
+                    chars_list = chars_list + [0]*(16-len(chars_list))
+                words_list.append(chars_list)
+            if len(words_list) < 48:
+                words_list = words_list + [[0]*16]*(48-len(words_list))
+            premise_char.append(words_list)
+            
         
-        if line.strip("\n") == "WORD_DICT":
-            is_word = True
-            is_char = False
-            is_label = False
-            continue
-        if line.strip("\n") == "CHAR_DICT":
-            is_char = True
-            is_word = False
-            is_label = False
-            continue
-        if line.strip("\n") == "DATA":
-            is_char = False
-            is_label = True
-            is_word = False
-            continue
+        hypothesis_char = []   
+        # hypothesis_char
+        for line in hypothesis:
+            words_list = []
+            for word in line.split(' '):
+                chars_list = []
+                for char in word:
+                    chars_list.append(char_dict[char.lower()])
+                if len(chars_list) < 16:
+                    chars_list = chars_list + [0]*(16-len(chars_list))
+                words_list.append(chars_list)
+            if len(words_list) < 48:
+                words_list = words_list + [[0]*16]*(48-len(words_list))
+            hypothesis_char.append(words_list)
 
-        if is_word and line != "\n":
-            word_dict[line.split(" ")[0]] = int(line.split(" ")[1])
-        if is_char and line != "\n":
-            char_dict[line.split(" ")[0]] = int(line.split(" ")[1])
-        if is_label and line != "\n":
-            if tag%5 == 0:
-                label_y.append(int(line.split(" ")[1]))
-            elif tag%5 == 1:
-                premise.append(line.strip("\n"))
-            elif tag%5 == 2:
-                hypothesis.append(line.strip("\n"))
-            elif tag%5 == 3:
-                premise_x.append(eval(line))
-            else:
-                hypothesis_x.append(eval(line))
-            tag += 1
+        return premise_x, hypothesis_x, label_y, premise_char, hypothesis_char
 
-    premise_char = []  
-    # premise_char
-    for line in premise:
-        words_list = []
-        for word in line.split(' '):
-            chars_list = []
-            for char in word:
-                chars_list.append(char_dict[char.lower()])
-            if len(chars_list) < 16:
-                chars_list = chars_list + [0]*(16-len(chars_list))
-            words_list.append(chars_list)
-        if len(words_list) < 48:
-            words_list = words_list + [[0]*16]*(48-len(words_list))
-        premise_char.append(words_list)
-        
-    
-    hypothesis_char = []   
-    # hypothesis_char
-    for line in hypothesis:
-        words_list = []
-        for word in line.split(' '):
-            chars_list = []
-            for char in word:
-                chars_list.append(char_dict[char.lower()])
-            if len(chars_list) < 16:
-                chars_list = chars_list + [0]*(16-len(chars_list))
-            words_list.append(chars_list)
-        if len(words_list) < 48:
-            words_list = words_list + [[0]*16]*(48-len(words_list))
-        hypothesis_char.append(words_list)
-
+    premise_x, hypothesis_x, label_y, premise_char, hypothesis_char = process_little_data()
     
     label_y = np.array(label_y)
     print(label_y)
     premise_x = np.array(premise_x)
-    premise_x = np.pad(premise_x, ((0,0),(0,48-11)), "constant",constant_values=(0,0))
+    premise_x = np.pad(premise_x, ((0,0),(0,CONFIGS.seq_len-11)), "constant",constant_values=(0,0))
     hypothesis_x = np.array(hypothesis_x)
-    hypothesis_x = np.pad(hypothesis_x, ((0,0),(0,48-11)), "constant",constant_values=(0,0))
+    hypothesis_x = np.pad(hypothesis_x, ((0,0),(0,CONFIGS.seq_len-11)), "constant",constant_values=(0,0))
+    print(premise_x)
+    print(hypothesis_x)
     premise_char = np.array(premise_char)
     hypothesis_char = np.array(hypothesis_char)
+
     # print(label_y.shape)
     # print(premise_char.shape)
     # print(premise_x.shape)
@@ -377,7 +399,7 @@ if __name__ == "__main__":
     is_train = True
     dropout_p = 0.5
 
-    model_log = open(CURRENT_PATH+"/model.log","w")
+    model_log = open(CURRENT_DIR+"/model.log","w")
 
     diin = DIIN()
     diin.build_graph()
@@ -386,13 +408,13 @@ if __name__ == "__main__":
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for i in range(100):
+        for i in range(10):
             losses, logits, global_step, debug= diin.update(
                 sess, label_y, premise_x, hypothesis_x,
                 premise_char, hypothesis_char, premise_pos, premise_pos,
                 premise_exact_match, hypothesis_exact_match, 
                 is_train)
-            print(debug, file=model_log)
+            debug_func(debug, model_log)
             print("losses:", losses, file=model_log)
             print("losses:", losses)
             print("logits:", np.argmax(logits, axis=1), file=model_log)
